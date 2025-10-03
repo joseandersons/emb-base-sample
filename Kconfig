@@ -1,3 +1,11 @@
 menu "Zephyr"
 source "Kconfig.zephyr"
 endmenu
+
+menu "App Options"
+
+config APP_TIMER_INTERVAL_MSS
+    int
+    default 100000000
+
+endmenu
