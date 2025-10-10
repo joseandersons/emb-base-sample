@@ -4,8 +4,9 @@ endmenu
 
 menu "App Options"
 
-config APP_TIMER_INTERVAL_MSS
-    int
-    default 100000000
+config LED_DELAY_MS
+    int "Tempo de piscar do LED (ms)"
+    default 10000
 
+CONFIG_MAIN_STACK_SIZE=2048
 endmenu
