@@ -4,9 +4,17 @@ endmenu
 
 menu "App Options"
 
-config LED_DELAY_MS
-    int "Tempo de piscar do LED (ms)"
-    default 10000
-
-CONFIG_MAIN_STACK_SIZE=2048
+config APP_PWM_PERIOD_NS
+    int "PWM period (ns)"
+    default 1000000
+config APP_BLINK_INTERVAL_MS
+    int "Blink interval (ms)"
+    default 500
+config APP_FADE_STEP
+    int "Fade step (%)"
+    range 1 20
+    default 5
+config APP_FADE_DELAY_MS
+    int "Fade delay (ms)"
+    default 30
 endmenu

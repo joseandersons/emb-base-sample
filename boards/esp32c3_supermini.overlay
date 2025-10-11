@@ -1,0 +1,53 @@
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/pinctrl/esp32-pinctrl.h>
+
+/* ---- LED PWM em GPIO7 usando LEDC canal 1 ---- */
+&pinctrl {
+    /* Verifique se este macro existe para o C3: LEDC_CH1_GPIO7 */
+    ledc0_gpio7_ch1: ledc0_gpio7_ch1 {
+        group1 {
+            pinmux = <LEDC_CH1_GPIO7>;
+            output-enable;
+        };
+    };
+};
+
+&ledc0 {
+    status = "okay";
+    pinctrl-0 = <&ledc0_gpio7_ch1>;
+    pinctrl-names = "default";
+
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    channel1: channel@1 {
+        reg = <1>;     /* Canal 1 */
+        timer = <0>;   /* Timer 0 (0..3) */
+        /* inverted;  // opcional */
+    };
+};
+
+ /{
+    aliases {
+        led0 = &pwm_led0;
+        sw0  = &button0;
+    };
+
+    pwmleds {
+        compatible = "pwm-leds";
+        pwm_led0: pwm_led_0 {
+            /* controller, canal, período(ns), flags */
+            pwms = <&ledc0 1 1000000 PWM_POLARITY_NORMAL>; /* 1 kHz */
+            label = "LED PWM externo (GPIO7)";
+        };
+    };
+
+    gpio_keys {
+        compatible = "gpio-keys";
+        button0: button_0 {
+            label = "User button";
+            gpios = <&gpio0 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        };
+    };
+};
