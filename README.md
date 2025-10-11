@@ -1,71 +1,46 @@
-# Atividades de Sistemas Embarcados
+### Implementação
 
-Este repositório contém exemplos e exercícios práticos para o curso de sistemas embarcados, utilizando Zephyr RTOS. As atividades abordam conceitos fundamentais como GPIO, PWM, timers e uso do sistema de logs.
-
----
-
-## Atividade 1 – Hello World com Timer
-
-### Objetivos
-
-- Implementar um Hello World periódico utilizando a API de timer do Zephyr.
-- Utilizar diferentes níveis de log para exibir a mensagem.
-- Configurar, via Kconfig, o intervalo de repetição da mensagem.
-
-### Etapas
-
-1. **Configuração inicial**
-   - Crie um projeto Zephyr básico.
-   - Habilite o módulo de log no arquivo `prj.conf`.
-   - Defina uma opção no `Kconfig` para configurar o intervalo do timer.
-
-2. **Implementação do timer**
-   - Implemente um timer periódico usando a API de timers do Zephyr.
-   - No callback do timer, imprima a mensagem “Hello World”.
-   - O intervalo do timer deve ser configurável via Kconfig.
-
-3. **Uso dos níveis de log**
-   - Utilize diferentes níveis de log (`LOG_INF`, `LOG_DBG`, `LOG_ERR`) para exibir a mensagem.
-   - Teste a alteração do nível de log no `prj.conf` e observe o comportamento.
+- **Plataforma:** ESP32‑C3 (SuperMini) com **LEDC** (controlador PWM da Espressif) via Zephyr.
+- **Mapeamento (DeviceTree Overlay):**
+  - **PWM**: LED em **GPIO7**, **canal LEDC 1**, exposto como `led0`.
+  - **Botão**: **GPIO9** com `GPIO_PULL_UP | GPIO_ACTIVE_LOW`, exposto como `sw0`.
+  - O canal LEDC é declarado como `channel@1 { reg = <1>; timer = <0>; }` e o pinmux como `LEDC_CH1_GPIO7`.
+- **Aplicativo:**
+  - **Modo Digital**: `k_timer` alterna 0%/100% de duty (pisca).
+  - **Modo PWM (fade)**: variação de duty 0→100%→0 com passo configurável.
+  - **Debounce por software** (≈150 ms) dentro do callback do botão.
+  - Função auxiliar `pwm_set_or_log()` para checar erros de PWM.
+- **Configuração por Kconfig (`CONFIG_APP_*`):**
+  - `CONFIG_APP_PWM_PERIOD_NS` – período do PWM (ex.: `1000000` = 1 kHz).
+  - `CONFIG_APP_BLINK_INTERVAL_MS` – intervalo do pisca digital.
+  - `CONFIG_APP_FADE_STEP` – passo do fade em %.
+  - `CONFIG_APP_FADE_DELAY_MS` – atraso entre passos do fade.
+- **Logs**: `LOG_INF` para eventos de modo, `LOG_ERR` para falhas de PWM/dispositivos.
 
 ---
 
-## Atividade 2 – Controle de Brilho de LED com GPIO, PWM e Botão
+### Como compilar, gravar e monitorar
 
-### Objetivos
+Comandos:
+```bash
+rm -rf build
+west build -b esp32c3_supermini . --pristine
+west flash
+west espressif monitor
+```
 
-- Compreender o uso de GPIO como entrada e saída.
-- Aplicar PWM para controlar o brilho de um LED.
-- Implementar interação entre botão e LED.
-
-### Etapas
-
-1. **Configuração simples**
-   - Configure um pino GPIO como saída.
-   - Escreva um código para ligar e desligar o LED.
-   - Ajuste o tempo de piscar do LED.
-
-2. **Controle do LED com botão**
-   - Configure outro pino GPIO como entrada para o botão.
-   - Altere o comportamento do LED quando o botão for pressionado.
-
-3. **Controle do brilho via PWM**
-   - Configure um pino com função PWM.
-   - Implemente a variação do duty cycle para modificar o brilho do LED.
-   - Crie um efeito de transição de brilho (fade in/fade out).
-
-4. **Integração botão + PWM**
-   - Defina dois modos de operação:
-     - **Modo 1:** LED acende/apaga normalmente (digital).
-     - **Modo 2:** LED apresenta variação gradual de brilho (PWM).
-   - Use o botão para alternar entre os modos.
+Saída esperada (exemplo):
+```
+*** Booting Zephyr OS build ...
+<inf> app: Sistema iniciado! Pressione o botão (GPIO9) para alternar modos.
+<inf> app: Modo digital (pisca) ativado
+# Ao apertar o botão:
+<inf> app: Modo PWM (fade) ativado
+```
 
 ---
 
-## Observações
+### Vídeo do funcionamento
 
-- Utilize o Zephyr RTOS e consulte a documentação oficial para detalhes sobre APIs de GPIO, PWM, timers e logs.
-- Os parâmetros de configuração devem ser definidos nos arquivos `prj.conf` e `Kconfig` do projeto.
-- Teste as funcionalidades em hardware compatível ou emuladores suportados pelo Zephyr.
 
----
+- ▶️ **Assistir o vídeo:** [assets/atividade2.mp4](assets/atividade2.mp4)
