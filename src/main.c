@@ -4,10 +4,10 @@
 #include <stdbool.h>
 #include <zephyr/random/random.h>
 
-// Inicializa módulo de logging
+/* Inicializa módulo de logging */
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
-// Configurações via Kconfig
+/* Configurações via Kconfig */
 #define Q_IN_LEN                CONFIG_APP_Q_IN_LEN
 #define Q_OUT_LEN               CONFIG_APP_Q_OUT_LEN
 #define PROD_TEMP_PERIOD_MS     CONFIG_APP_PROD_TEMP_PERIOD_MS
@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #define UMID_MIN_PCT            CONFIG_APP_UMID_MIN_PCT
 #define UMID_MAX_PCT            CONFIG_APP_UMID_MAX_PCT
 
-// Parâmetros das threads
+/* Parâmetros das threads */
 #define STACK_SIZE 1024
 #define PRIO_PROD 4
 #define PRIO_FILTER 3
@@ -34,7 +34,7 @@ typedef struct {
     int64_t       ts_ms; 
 } sensor_msg_t;
 
-// Inicializa filas de mensagens de sensores
+/* Inicializa filas de mensagens de sensores */
 K_MSGQ_DEFINE(q_in,  sizeof(sensor_msg_t), Q_IN_LEN,  8);
 K_MSGQ_DEFINE(q_out, sizeof(sensor_msg_t), Q_OUT_LEN, 8);
 
@@ -77,11 +77,6 @@ static void producer_temp(void *p1, void *p2, void *p3) {
         };
 
         (void)k_msgq_put(&q_in, &m, K_FOREVER);
-
-        LOG_DBG("[prod_temp] put q_in  val=%.2f ts=%lld used=%u/%u",
-                (double)m.value, (long long)m.ts_ms,
-                k_msgq_num_used_get(&q_in), Q_IN_LEN);
-
         k_msleep(PROD_TEMP_PERIOD_MS);
     }
 }
@@ -99,11 +94,6 @@ static void producer_umid(void *p1, void *p2, void *p3) {
         };
 
         (void)k_msgq_put(&q_in, &m, K_FOREVER);
-
-        LOG_DBG("[prod_umid] put q_in  val=%.2f ts=%lld used=%u/%u",
-                (double)m.value, (long long)m.ts_ms,
-                k_msgq_num_used_get(&q_in), Q_IN_LEN);
-
         k_msleep(PROD_UMID_PERIOD_MS);
     }
 }
@@ -117,18 +107,9 @@ static void filter_thread(void *p1, void *p2, void *p3) {
     while (1) {
         k_msgq_get(&q_in, &m, K_FOREVER);
 
-        LOG_DBG("[filter]  get q_in  type=%s val=%.2f ts=%lld used=%u/%u",
-                (m.type==SENSOR_TEMP)?"TEMP":"UMID",
-                (double)m.value, (long long)m.ts_ms,
-                k_msgq_num_used_get(&q_in), Q_IN_LEN);
-
         if (validate(&m)) {
             (void)k_msgq_put(&q_out, &m, K_FOREVER);
 
-            LOG_DBG("[filter]  put q_out type=%s val=%.2f used=%u/%u",
-                    (m.type==SENSOR_TEMP)?"TEMP":"UMID",
-                    (double)m.value,
-                    k_msgq_num_used_get(&q_out), Q_OUT_LEN);
         } else {
             if (m.type == SENSOR_TEMP) {
                 LOG_WRN("TEMP fora: %.2f C @ %lld ms (aceito: %d..%d)",
@@ -149,11 +130,6 @@ static void consumer_thread(void *p1, void *p2, void *p3) {
 
     while (1) {
         k_msgq_get(&q_out, &m, K_FOREVER);
-
-        LOG_DBG("[consumer] get q_out type=%s val=%.2f ts=%lld used=%u/%u",
-                (m.type==SENSOR_TEMP)?"TEMP":"UMID",
-                (double)m.value, (long long)m.ts_ms,
-                k_msgq_num_used_get(&q_out), Q_OUT_LEN);
 
         if (m.type == SENSOR_TEMP) {
             LOG_INF("OK -> Temp: %.2f C (t=%lld ms)", (double)m.value, (long long)m.ts_ms);
