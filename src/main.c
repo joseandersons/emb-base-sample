@@ -1,80 +1,176 @@
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/pwm.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <zephyr/random/random.h>
 
-LOG_MODULE_REGISTER(app);
+// Inicializa módulo de logging
+LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
-#define PWM_PERIOD_NS CONFIG_APP_PWM_PERIOD_NS
-#define LED_BLINK_INTERVAL_MS CONFIG_APP_BLINK_INTERVAL_MS
+// Configurações via Kconfig
+#define Q_IN_LEN                CONFIG_APP_Q_IN_LEN
+#define Q_OUT_LEN               CONFIG_APP_Q_OUT_LEN
+#define PROD_TEMP_PERIOD_MS     CONFIG_APP_PROD_TEMP_PERIOD_MS
+#define PROD_UMID_PERIOD_MS     CONFIG_APP_PROD_UMID_PERIOD_MS
+#define TEMP_MIN_C              CONFIG_APP_TEMP_MIN_C
+#define TEMP_MAX_C              CONFIG_APP_TEMP_MAX_C
+#define UMID_MIN_PCT            CONFIG_APP_UMID_MIN_PCT
+#define UMID_MAX_PCT            CONFIG_APP_UMID_MAX_PCT
 
-static const struct pwm_dt_spec pwm_led = PWM_DT_SPEC_GET(DT_ALIAS(led0));
-static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
+// Parâmetros das threads
+#define STACK_SIZE 1024
+#define PRIO_PROD 4
+#define PRIO_FILTER 3
+#define PRIO_CONS 5
 
-static struct gpio_callback button_cb_data;
-static struct k_timer led_timer;
-static bool is_pwm_mode = false;
+typedef enum {
+    SENSOR_TEMP = 0,
+    SENSOR_UMID = 1
+} sensor_type_t;
+
+typedef struct {
+    sensor_type_t type;  
+    float         value; 
+    int64_t       ts_ms; 
+} sensor_msg_t;
+
+// Inicializa filas de mensagens de sensores
+K_MSGQ_DEFINE(q_in,  sizeof(sensor_msg_t), Q_IN_LEN,  8);
+K_MSGQ_DEFINE(q_out, sizeof(sensor_msg_t), Q_OUT_LEN, 8);
 
 
-static inline void pwm_set_or_log(uint32_t period, uint32_t pulse) {
-    int err = pwm_set_dt(&pwm_led, period, pulse);
-    if (err) {
-        LOG_ERR("pwm_set_dt(period=%u, pulse=%u) falhou (%d)", period, pulse, err);
-    }
+/* -------------------- Mock dos Sensores -------------------- */
+/* Gera inteiros uniformes de 0 a 100  */
+static inline float mock_0_100(void) {
+    return (float)(sys_rand32_get() % 101u);
 }
 
-void led_timer_handler(struct k_timer *dummy) {
-    static bool led_state = false;
-    pwm_set_or_log(PWM_PERIOD_NS, led_state ? PWM_PERIOD_NS : 0);
-    led_state = !led_state;
+static float mock_temp_c(void) {
+    return mock_0_100();
 }
 
-void fade_pwm(void) {
-    static int bright = 0;
-    static int step = CONFIG_APP_FADE_STEP;
-    bright += step;
-    if (bright >= 100 || bright <= 0) step = -step;
-    uint32_t pulse = (PWM_PERIOD_NS * bright) / 100U;
-    pwm_set_or_log(PWM_PERIOD_NS, pulse);
-    k_msleep(CONFIG_APP_FADE_DELAY_MS);
+static float mock_umid_pct(void) {
+    return mock_0_100();
 }
 
-void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-    static int64_t last = 0;
-    int64_t now = k_uptime_get();
-    if (now - last < 150) return; // 150 ms de debounce
-    last = now;
-    
-    is_pwm_mode = !is_pwm_mode;
-    if (is_pwm_mode) {
-        k_timer_stop(&led_timer);
-        LOG_INF("Modo PWM (fade) ativado");
-    } else {
-        k_timer_start(&led_timer, K_MSEC(LED_BLINK_INTERVAL_MS), K_MSEC(LED_BLINK_INTERVAL_MS));
-        LOG_INF("Modo digital (pisca) ativado");
-    }
+/* ---- Validação isolada ---- */
+static inline bool is_temp_ok(float v) {
+    return v >= (float)TEMP_MIN_C && v <= (float)TEMP_MAX_C;
+}
+static inline bool is_umid_ok(float v) {
+    return v >= (float)UMID_MIN_PCT && v <= (float)UMID_MAX_PCT;
+}
+static inline bool validate(const sensor_msg_t *m) {
+    return (m->type == SENSOR_TEMP) ? is_temp_ok(m->value) : is_umid_ok(m->value);
 }
 
-int main(void) {
-
-    if (!device_is_ready(pwm_led.dev) || !device_is_ready(button.port)) {
-        LOG_ERR("Erro: dispositivos não estão prontos!");
-        return 0;
-    }
-
-    gpio_pin_configure_dt(&button, GPIO_INPUT);
-    gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
-    gpio_add_callback(button.port, &button_cb_data);
-    gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
-
-    k_timer_init(&led_timer, led_timer_handler, NULL);
-    k_timer_start(&led_timer, K_MSEC(LED_BLINK_INTERVAL_MS), K_MSEC(LED_BLINK_INTERVAL_MS));
-
-    LOG_INF("Sistema iniciado! Pressione o botão (GPIO9) para alternar modos.");
+/* Produtor: Temperatura */
+static void producer_temp(void *p1, void *p2, void *p3) {
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+    k_thread_name_set(k_current_get(), "prod_temp");
 
     while (1) {
-        if (is_pwm_mode)
-            fade_pwm();
-        k_msleep(30);
+        sensor_msg_t m = {
+            .type  = SENSOR_TEMP,
+            .value = mock_temp_c(),
+            .ts_ms = k_uptime_get()
+        };
+
+        (void)k_msgq_put(&q_in, &m, K_FOREVER);
+
+        LOG_DBG("[prod_temp] put q_in  val=%.2f ts=%lld used=%u/%u",
+                (double)m.value, (long long)m.ts_ms,
+                k_msgq_num_used_get(&q_in), Q_IN_LEN);
+
+        k_msleep(PROD_TEMP_PERIOD_MS);
     }
 }
+
+/* Produtor: Umidade */
+static void producer_umid(void *p1, void *p2, void *p3) {
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+    k_thread_name_set(k_current_get(), "prod_umid");
+
+    while (1) {
+        sensor_msg_t m = {
+            .type  = SENSOR_UMID,
+            .value = mock_umid_pct(), 
+            .ts_ms = k_uptime_get()
+        };
+
+        (void)k_msgq_put(&q_in, &m, K_FOREVER);
+
+        LOG_DBG("[prod_umid] put q_in  val=%.2f ts=%lld used=%u/%u",
+                (double)m.value, (long long)m.ts_ms,
+                k_msgq_num_used_get(&q_in), Q_IN_LEN);
+
+        k_msleep(PROD_UMID_PERIOD_MS);
+    }
+}
+
+/* Filtro */
+static void filter_thread(void *p1, void *p2, void *p3) {
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+    k_thread_name_set(k_current_get(), "filter");
+    sensor_msg_t m;
+
+    while (1) {
+        k_msgq_get(&q_in, &m, K_FOREVER);
+
+        LOG_DBG("[filter]  get q_in  type=%s val=%.2f ts=%lld used=%u/%u",
+                (m.type==SENSOR_TEMP)?"TEMP":"UMID",
+                (double)m.value, (long long)m.ts_ms,
+                k_msgq_num_used_get(&q_in), Q_IN_LEN);
+
+        if (validate(&m)) {
+            (void)k_msgq_put(&q_out, &m, K_FOREVER);
+
+            LOG_DBG("[filter]  put q_out type=%s val=%.2f used=%u/%u",
+                    (m.type==SENSOR_TEMP)?"TEMP":"UMID",
+                    (double)m.value,
+                    k_msgq_num_used_get(&q_out), Q_OUT_LEN);
+        } else {
+            if (m.type == SENSOR_TEMP) {
+                LOG_WRN("TEMP fora: %.2f C @ %lld ms (aceito: %d..%d)",
+                        (double)m.value, (long long)m.ts_ms, TEMP_MIN_C, TEMP_MAX_C);
+            } else {
+                LOG_WRN("UMID fora: %.2f %% @ %lld ms (aceito: %d..%d)",
+                        (double)m.value, (long long)m.ts_ms, UMID_MIN_PCT, UMID_MAX_PCT);
+            }
+        }
+    }
+}
+
+/* ---- Consumidor: lê apenas q_out ---- */
+static void consumer_thread(void *p1, void *p2, void *p3) {
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+    k_thread_name_set(k_current_get(), "consumer");
+    sensor_msg_t m;
+
+    while (1) {
+        k_msgq_get(&q_out, &m, K_FOREVER);
+
+        LOG_DBG("[consumer] get q_out type=%s val=%.2f ts=%lld used=%u/%u",
+                (m.type==SENSOR_TEMP)?"TEMP":"UMID",
+                (double)m.value, (long long)m.ts_ms,
+                k_msgq_num_used_get(&q_out), Q_OUT_LEN);
+
+        if (m.type == SENSOR_TEMP) {
+            LOG_INF("OK -> Temp: %.2f C (t=%lld ms)", (double)m.value, (long long)m.ts_ms);
+        } else {
+            LOG_INF("OK -> Umid: %.2f %% (t=%lld ms)", (double)m.value, (long long)m.ts_ms);
+        }
+    }
+}
+
+/* Criação estática das threads produtoras */
+K_THREAD_DEFINE(t_prod_temp, STACK_SIZE, producer_temp, NULL, NULL, NULL, PRIO_PROD, 0, 0);
+K_THREAD_DEFINE(t_prod_umid, STACK_SIZE, producer_umid, NULL, NULL, NULL, PRIO_PROD, 0, 50);                                                                                                                
+K_THREAD_DEFINE(t_filter, STACK_SIZE, filter_thread,  NULL, NULL, NULL, PRIO_FILTER, 0, 0);
+K_THREAD_DEFINE(t_cons,   STACK_SIZE, consumer_thread,NULL, NULL, NULL, PRIO_CONS,   0, 0);                                                                                                                                                                                                                                                                                                                                             
+
+int main(void) {
+    LOG_INF("Pipeline Produtores -> Filtro -> Consumidor iniciado.");
+    return 0;
+}
+

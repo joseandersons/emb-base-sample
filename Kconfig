@@ -4,17 +4,40 @@ endmenu
 
 menu "App Options"
 
-config APP_PWM_PERIOD_NS
-    int "PWM period (ns)"
-    default 1000000
-config APP_BLINK_INTERVAL_MS
-    int "Blink interval (ms)"
+config APP_Q_IN_LEN
+    int "Tamanho da fila de entrada (q_in)"
+    range 1 128
+    default 16
+
+config APP_Q_OUT_LEN
+    int "Tamanho da fila de saída (q_out)"
+    range 1 128
+    default 16
+
+config APP_PROD_TEMP_PERIOD_MS
+    int "Período do produtor de Temperatura (ms)"
+    range 10 10000
     default 500
-config APP_FADE_STEP
-    int "Fade step (%)"
-    range 1 20
-    default 5
-config APP_FADE_DELAY_MS
-    int "Fade delay (ms)"
+
+config APP_PROD_UMID_PERIOD_MS
+    int "Período do produtor de Umidade (ms)"
+    range 10 10000
+    default 700
+
+config APP_TEMP_MIN_C
+    int "Temperatura mínima aceita (°C)"
+    default 18
+
+config APP_TEMP_MAX_C
+    int "Temperatura máxima aceita (°C)"
     default 30
+
+config APP_UMID_MIN_PCT
+    int "Umidade mínima aceita (%)"
+    default 40
+
+config APP_UMID_MAX_PCT
+    int "Umidade máxima aceita (%)"
+    default 70
+
 endmenu
