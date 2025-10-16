@@ -5,7 +5,7 @@
 #include <zephyr/random/random.h>
 
 /* Inicializa módulo de logging */
-LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(app);
 
 /* Configurações via Kconfig */
 #define Q_IN_LEN                CONFIG_APP_Q_IN_LEN
