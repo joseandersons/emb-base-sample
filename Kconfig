@@ -1,39 +1,22 @@
-menu "Zephyr"
 source "Kconfig.zephyr"
-endmenu
 
-menu "App Options"
+menu "App Network Settings"
 
-config APP_Q_IN_LEN
-    int "Tamanho da fila de entrada (q_in)"
-    default 16
+config SNTP_HOSTNAME
+	string "SNTP server hostname"
+	default "pool.ntp.org"
 
-config APP_Q_OUT_LEN
-    int "Tamanho da fila de saída (q_out)"
-    default 16
+config WIFI_SSID
+	string "Wi-Fi SSID"
+	default ""
 
-config APP_PROD_TEMP_PERIOD_MS
-    int "Período do produtor de Temperatura (ms)"
-    default 500
+config WIFI_PASSWD
+	string "Wi-Fi password"
+	default ""
 
-config APP_PROD_UMID_PERIOD_MS
-    int "Período do produtor de Umidade (ms)"
-    default 700
-
-config APP_TEMP_MIN_C
-    int "Temperatura mínima aceita (°C)"
-    default 18
-
-config APP_TEMP_MAX_C
-    int "Temperatura máxima aceita (°C)"
-    default 30
-
-config APP_UMID_MIN_PCT
-    int "Umidade mínima aceita (%)"
-    default 40
-
-config APP_UMID_MAX_PCT
-    int "Umidade máxima aceita (%)"
-    default 70
+config LOCAL_TIME
+	int "Local time offset (hours)"
+	range -12 14
+	default 0
 
 endmenu

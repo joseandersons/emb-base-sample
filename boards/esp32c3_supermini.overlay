@@ -13,6 +13,11 @@
     };
 };
 
+&wifi {
+    status = "okay";
+};
+
+
 &ledc0 {
     status = "okay";
     pinctrl-0 = <&ledc0_gpio7_ch1>;
