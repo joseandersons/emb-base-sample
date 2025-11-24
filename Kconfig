@@ -1,3 +1,21 @@
 menu "Zephyr"
 source "Kconfig.zephyr"
+
+menu "Display Simulado"
+
+config DISPLAY_ANSI_COLORS
+    bool "Ativar cores ANSI no display"
+    default y
+
+config DISPLAY_ANSI_CLEAR_ON_UPDATE
+    bool "Limpar tela a cada atualização"
+    default y
+
+config DISPLAY_ALERT_PERCENT
+    int "Percentual de alerta (em % do limite)"
+    default 90
+
+endmenu
+
+
 endmenu
