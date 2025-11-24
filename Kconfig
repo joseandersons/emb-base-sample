@@ -1,4 +1,3 @@
-menu "Zephyr"
 source "Kconfig.zephyr"
 
 menu "Display Simulado"
@@ -15,7 +14,13 @@ config DISPLAY_ALERT_PERCENT
     int "Percentual de alerta (em % do limite)"
     default 90
 
-endmenu
+config DISPLAY_LIMITE_LEVE
+    int "Limite de velocidade para veículos leves"
+    default 60
 
+
+config DISPLAY_LIMITE_PESADO
+    int "Limite de velocidade para veículos pesados"
+    default 40
 
 endmenu

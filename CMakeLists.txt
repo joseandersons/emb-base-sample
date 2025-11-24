@@ -10,4 +10,5 @@ zephyr_include_directories(include)
 target_sources(app PRIVATE
     src/main.c
     src/display.c
+    src/radar_core.c
 )
