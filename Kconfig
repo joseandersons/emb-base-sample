@@ -29,7 +29,7 @@ config CAMERA_FAKE_FAIL_RATE
 
 config RADAR_CAMERA_FAILURE_RATE_PERCENT
     int "Porcentagem de falha simulada da câmera (%)"
-    default 50
+    default 10
     range 0 100
 
 config RADAR_SPEED_LIMIT_LIGHT_KMH

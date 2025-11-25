@@ -39,12 +39,19 @@ struct data {
 	} item;
 
 	union value {
-		double speed;
+		uint32_t speed;
 		uint32_t timestamp;
 	} value;
 
 	int eixos;
 };
+
+struct display_msg {
+    int velocidade;
+    enum tipo_veiculo_t tipo;
+};
+
+K_MSGQ_DEFINE(display_queue, sizeof(struct display_msg), 10, 4);
 
 K_MSGQ_DEFINE(sensor_queue, sizeof(struct data), 10, 4);
 K_MSGQ_DEFINE(vehicle_queue, sizeof(struct data), 10, 4);
@@ -61,6 +68,24 @@ static struct gpio_callback sensor0_data;
 static struct gpio_callback sensor1_data;
 
 static enum STATE radar_state = IDLE;
+
+extern bool plate_is_valid(const char *raw);
+
+
+void display_thread(void *arg1, void *arg2, void *arg3)
+{
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    struct display_msg msg;
+
+    while (1) {
+        if (k_msgq_get(&display_queue, &msg, K_FOREVER) == 0) {
+            display_update(msg.velocidade, msg.tipo);
+        }
+    }
+}
 
 static void sensor0_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -184,13 +209,16 @@ void control_thread(void *arg1, void *arg2, void *arg3)
 
 	while (true) {
 		err = k_msgq_get(&vehicle_queue, &vehicle, K_FOREVER);
-        
-	
-		if (err) {
-			continue;
-		}
+        if (err) {
+            continue;
+        }
 
-        display_update((int)(vehicle.value.speed), vehicle.item.type);
+        struct display_msg d = {
+            .velocidade = vehicle.value.speed,
+            .tipo = vehicle.item.type
+        };
+
+        k_msgq_put(&display_queue, &d, K_NO_WAIT);
 
 		if ((vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_LIGHT_KMH && vehicle.item.type == LEVE) || 
             (vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_HEAVY_KMH && vehicle.item.type == PESADO )){
@@ -302,3 +330,4 @@ int main(void)
 
 K_THREAD_DEFINE(control_thread_id, 1024, control_thread, NULL, NULL, NULL, 4, 0, 0);
 K_THREAD_DEFINE(sensor_thread_id, 1024, sensor_thread, NULL, NULL, NULL, 4, 0, 0);
+K_THREAD_DEFINE(display_thread_id, 1024, display_thread, NULL, NULL, NULL, 4, 0, 0);

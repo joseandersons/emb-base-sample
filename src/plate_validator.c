@@ -104,14 +104,12 @@ bool plate_is_valid(const char *raw)
         if (isalpha((unsigned char)c) || isdigit((unsigned char)c)) {
             pclean[j++] = (char)toupper((unsigned char)c);
         } else {
-            // caractere estranho: reprova direto
             return false;
         }
     }
 
     pclean[j] = '\0';
 
-    // Todos os padrões Mercosul que estamos aceitando têm 7 caracteres
     if (j != 7)
         return false;
 
