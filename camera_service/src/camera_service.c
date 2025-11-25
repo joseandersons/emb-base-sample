@@ -22,6 +22,12 @@ ZBUS_CHAN_DEFINE(chan_camera_evt, struct msg_camera_evt, NULL, NULL, ZBUS_OBSERV
 
 ZBUS_MSG_SUBSCRIBER_DEFINE(msub_camera_cmd);
 
+static bool camera_should_fail(void)
+{
+	uint32_t r = sys_rand32_get() % 100;
+	return r < CONFIG_RADAR_CAMERA_FAILURE_RATE_PERCENT;
+}
+
 int camera_api_capture(k_timeout_t timeout)
 {
 	struct msg_camera_cmd msg = {.type = MSG_CAMERA_CMD_TYPE_CAPTURE};
@@ -58,19 +64,27 @@ void camera_thread(void *ptr1, void *ptr2, void *ptr3)
 			/* Simulate the camera taking the pucture it takes from 0 to 256 ms */
 			k_busy_wait(sys_rand8_get() * 1000);
 
-			int random_key = sys_rand16_get() % 1100;
-
-			if (random_key < 900) {
-				evt.type = MSG_CAMERA_EVT_TYPE_DATA;
-				evt.captured_data =
-					valid_car_license_plates + (random_key % valid_array_size);
-			} else if (900 <= random_key && random_key < 1000) {
-				evt.type = MSG_CAMERA_EVT_TYPE_DATA;
-				evt.captured_data = invalid_car_license_plates +
-						    (random_key % invalid_array_size);
-			} else {
+			if (camera_should_fail()) {
 				evt.type = MSG_CAMERA_EVT_TYPE_ERROR;
 				evt.error_code = -EBUSY;
+			} else {
+				if (camera_should_fail()) {
+					evt.type = MSG_CAMERA_EVT_TYPE_ERROR;
+					evt.error_code = -EBUSY;
+				} else {
+					int random_key = sys_rand16_get() % 1000;
+
+					if (random_key < 900) {
+						evt.type = MSG_CAMERA_EVT_TYPE_DATA;
+						evt.captured_data =
+							valid_car_license_plates + (random_key % valid_array_size);
+					} else {
+						evt.type = MSG_CAMERA_EVT_TYPE_DATA;
+						evt.captured_data =
+							invalid_car_license_plates + (random_key % invalid_array_size);
+					}
+				}
+
 			}
 
 			err = zbus_chan_pub(&chan_camera_evt, &evt, K_MSEC(200));

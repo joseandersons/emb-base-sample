@@ -5,5 +5,9 @@ config CAMERA_FAKE_FAIL_RATE
     int "Taxa de falha da câmera (%)"
     default 10
 
+config RADAR_CAMERA_FAILURE_RATE_PERCENT
+    int "Porcentagem de falha simulada da câmera (%)"
+    default 50
+    range 0 100
 
 endmenu
