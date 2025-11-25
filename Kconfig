@@ -10,4 +10,14 @@ config RADAR_CAMERA_FAILURE_RATE_PERCENT
     default 50
     range 0 100
 
+config RADAR_SPEED_LIMIT_LIGHT_KMH
+  int "Limit speed for light vehicles (msec)"
+  default 60
+  range 0 1000
+
+config RADAR_SPEED_LIMIT_HEAVY_KMH
+  int "Limit speed for heavy vehicles (msec)"
+  default 50
+  range 0 1000
+  
 endmenu
