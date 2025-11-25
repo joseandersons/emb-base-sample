@@ -11,4 +11,9 @@ config RADAR_SPEED_LIMIT_HEAVY_KMH
   default 50
   range 0 1000
 
+config RADAR_SENSOR_DISTANCE_MM
+  int "Distances between radar sensors (mm)"
+  default 10000
+  range 0 100000
+
 endmenu
