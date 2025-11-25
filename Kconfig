@@ -1,3 +1,9 @@
 menu "Zephyr"
 source "Kconfig.zephyr"
+
+config CAMERA_FAKE_FAIL_RATE
+    int "Taxa de falha da câmera (%)"
+    default 10
+
+
 endmenu
