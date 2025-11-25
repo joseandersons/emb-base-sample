@@ -1,6 +1,5 @@
+menu "Zephyr"
 source "Kconfig.zephyr"
-
-menu "Display Simulado"
 
 config DISPLAY_ANSI_COLORS
     bool "Ativar cores ANSI no display"
@@ -22,5 +21,25 @@ config DISPLAY_LIMITE_LEVE
 config DISPLAY_LIMITE_PESADO
     int "Limite de velocidade para veículos pesados"
     default 40
+
+
+config CAMERA_FAKE_FAIL_RATE
+    int "Taxa de falha da câmera (%)"
+    default 10
+
+config RADAR_CAMERA_FAILURE_RATE_PERCENT
+    int "Porcentagem de falha simulada da câmera (%)"
+    default 50
+    range 0 100
+
+config RADAR_SPEED_LIMIT_LIGHT_KMH
+  int "Limit speed for light vehicles (msec)"
+  default 60
+  range 0 1000
+
+config RADAR_SPEED_LIMIT_HEAVY_KMH
+  int "Limit speed for heavy vehicles (msec)"
+  default 50
+  range 0 1000
 
 endmenu
