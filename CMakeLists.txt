@@ -20,5 +20,5 @@ target_sources(app PRIVATE
     src/display.c
     src/radar_core.c
     src/plate_validator.c
-
+)
 

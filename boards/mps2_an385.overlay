@@ -1,18 +1,6 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 
 / {
-    chosen {
-        zephyr,display = &dummy_dc;
-    };
-
-    dummy_dc: dummy_dc {
-        compatible = "zephyr,dummy-dc";
-        status = "okay";
-        width = <80>;
-        height = <24>;
-    };
-};
-
 	aliases {
 		button0 = &button0;
 		button1 = &button1;
@@ -43,4 +31,15 @@
 			gpios = <&gpio_sim 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 		};
 	};
+
+    chosen {
+        zephyr,display = &dummy_dc;
+    };
+
+    dummy_dc: dummy_dc {
+        compatible = "zephyr,dummy-dc";
+        status = "okay";
+        width = <80>;
+        height = <24>;
+    };
 };
