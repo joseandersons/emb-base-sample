@@ -1,5 +1,4 @@
 #include "zephyr/toolchain.h"
-#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <zephyr/device.h>
@@ -129,8 +128,11 @@ void sensor_thread(void *arg1, void *arg2, void *arg3)
 				k_timer_stop(&timeout_vehicle);
 				k_timer_start(&timeout_vehicle, K_MSEC(700), K_NO_WAIT);
 			} else if (recv_data.item.from == SENSOR_1) {
+				if (speed_done) {
+					break;
+				}
 				uint32_t dt = recv_data.value.timestamp - init_timestamp;
-				vehicle.value.speed = (10000.0 / dt);
+				vehicle.value.speed = (CONFIG_RADAR_SENSOR_DISTANCE_MM / dt) * 3.6;
 				speed_done = true;
 			} else if (recv_data.item.from == TIMER) {
 				radar_state = DONE;
@@ -179,13 +181,8 @@ void control_thread(void *arg1, void *arg2, void *arg3)
 			continue;
 		}
 
-		if (vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_LIGHT_KMH &&
-		    vehicle.item.type == LEVE) {
-			LOG_INF("Infracao, veiculo LEVE: %d km/h", (int)(vehicle.value.speed));
-		} else if (vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_HEAVY_KMH &&
-			   vehicle.item.type == PESADO) {
-			LOG_INF("Infracao, veiculo PESADO: %d km/h", (int)(vehicle.value.speed));
-		}
+        display_update((int)(vehicle.value.speed), vehicle.item.type);
+
 	}
 }
 
@@ -197,16 +194,19 @@ int main(void)
 	LOG_INF("Starting system...");
 
 	if (!gpio_is_ready_dt(&sensor0) || !gpio_is_ready_dt(&sensor1)) {
+		LOG_ERR("Error: Sensor GPIO devices are not ready\n");
 		return 0;
 	}
 
 	ret = gpio_pin_configure_dt(&sensor0, GPIO_INPUT);
-	if (ret) {
+	if (ret < 0) {
+		LOG_ERR("Error: Failed to configure Sensor 0 pin (err: %d)\n", ret);
 		return 0;
 	}
 
 	ret = gpio_pin_configure_dt(&sensor1, GPIO_INPUT);
-	if (ret) {
+	if (ret < 0) {
+		LOG_ERR("Error: Failed to configure Sensor 1 pin (err: %d)\n", ret);
 		return 0;
 	}
 
@@ -218,13 +218,13 @@ int main(void)
 
 	ret = gpio_pin_interrupt_configure_dt(&sensor0, GPIO_INT_EDGE_TO_ACTIVE);
 	if (ret != 0) {
-		printk("Erro ao configurar interrupção: %d\n", ret);
+		LOG_ERR("Error configuring interrupt: %d\n", ret);
 		return 0;
 	}
 
 	ret = gpio_pin_interrupt_configure_dt(&sensor1, GPIO_INT_EDGE_TO_ACTIVE);
 	if (ret != 0) {
-		printk("Erro ao configurar interrupção: %d\n", ret);
+		LOG_ERR("Error configuring interrupt: %d\n", ret);
 		return 0;
 	}
 
