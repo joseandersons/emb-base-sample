@@ -9,6 +9,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/zbus/zbus.h>
+#include "camera_service.h"
+#include "display.h"
 
 LOG_MODULE_REGISTER(semaforo);
 
@@ -45,6 +48,9 @@ struct data {
 
 K_MSGQ_DEFINE(sensor_queue, sizeof(struct data), 10, 4);
 K_MSGQ_DEFINE(vehicle_queue, sizeof(struct data), 10, 4);
+
+ZBUS_MSG_SUBSCRIBER_DEFINE(msub_camera_evt);
+ZBUS_CHAN_ADD_OBS(chan_camera_evt, msub_camera_evt, 3);
 
 static const struct device *const console_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
 
@@ -174,15 +180,59 @@ void control_thread(void *arg1, void *arg2, void *arg3)
 
 	struct data vehicle;
 	int err;
+    const struct zbus_channel *chan;
 
 	while (true) {
 		err = k_msgq_get(&vehicle_queue, &vehicle, K_FOREVER);
+        
+	
 		if (err) {
 			continue;
 		}
 
         display_update((int)(vehicle.value.speed), vehicle.item.type);
 
+		if ((vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_LIGHT_KMH && vehicle.item.type == LEVE) || 
+            (vehicle.value.speed > CONFIG_RADAR_SPEED_LIMIT_HEAVY_KMH && vehicle.item.type == PESADO )){
+			err = camera_api_capture(K_FOREVER);
+
+            if (err) {
+                printk("Could not init capture. Error: %d\n", err);
+                continue;
+            }
+
+            struct msg_camera_evt rsp;
+
+            /* Espera evento da câmera via ZBus */
+            err = zbus_sub_wait_msg(&msub_camera_evt, &chan, &rsp, K_FOREVER);
+            if (err) {
+                printk("ERROR: %d\n", err);
+                continue;
+            }
+
+            /* Evento de erro da câmera */
+            if (rsp.type == MSG_CAMERA_EVT_TYPE_ERROR) {
+                printk("Camera service unavailable. Error code %d\n", rsp.error_code);
+                continue;
+            }
+
+            /* houve captura */
+            if (rsp.type == MSG_CAMERA_EVT_TYPE_DATA) {
+
+                const char *plate = rsp.captured_data->plate;
+
+                printk("Camera data: plate=%s, hash=%s\n",
+                    plate,
+                    rsp.captured_data->hash);
+
+                /* Validação da placa Mercosul */
+                if (plate_is_valid(plate)) {
+                    printk("Placa válida\n");
+                } else {
+                    printk("Placa inválida\n");
+                }
+            }
+		} 
 	}
 }
 
